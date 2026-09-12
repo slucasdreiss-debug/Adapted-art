@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adapted Art AAC & NCAS Language Tool</title>
+<style>
+:root{--bg-color:#000;--card-bg:#111;--card-hover:#222;--text-color:#fff;--accent-color:#ff0;--border-color:#fff;--symbol-color:#fff;--nav-back-bg:#c00;--nav-reset-bg:#05f;--card-border-width:6px;--font-family:Arial,Helvetica,sans-serif}
+body.theme-light{--bg-color:#fff;--card-bg:#f0f0f0;--card-hover:#e0e0e0;--text-color:#000;--accent-color:#0000cc;--border-color:#000;--symbol-color:#000;--nav-back-bg:#900;--nav-reset-bg:#039}
+body.theme-reduced{--bg-color:#000;--card-bg:#000;--card-hover:#1a1a1a;--text-color:#fff;--accent-color:#ff0;--border-color:#ff0;--symbol-color:#ff0;--card-border-width:8px}
+*{box-sizing:border-box;margin:0;padding:0;user-select:none}
+body{background:var(--bg-color);color:var(--text-color);font-family:var(--font-family);min-height:100vh;display:flex;flex-direction:column;padding:12px}
+#teacher-controls{display:flex;justify-content:space-between;align-items:center;background:var(--card-bg);border:3px solid var(--border-color);border-radius:8px;padding:8px 12px;margin-bottom:10px;gap:10px;flex-wrap:wrap}
+.teacher-label{font-size:1.1rem;font-weight:bold}
+.theme-btn-group{display:flex;gap:8px;flex-wrap:wrap}
+.theme-btn{padding:8px 12px;font-size:1rem;font-weight:bold;border:2px solid var(--border-color);background:var(--bg-color);color:var(--text-color);border-radius:6px;cursor:pointer}
+.theme-btn:focus,.theme-btn:hover{outline:3px solid var(--accent-color)}
+#sentence-bar{background:var(--card-bg);border:var(--card-border-width) solid var(--accent-color);border-radius:12px;padding:12px 16px;min-height:95px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px}
+#sentence-text{font-size:2.2rem;font-weight:bold;color:var(--accent-color);line-height:1.2}
+#speak-btn{background:var(--accent-color);color:#000;border:3px solid var(--border-color);padding:12px 20px;font-size:1.5rem;font-weight:bold;border-radius:8px;cursor:pointer;flex-shrink:0}
+body.theme-light #speak-btn{color:#fff}
+#nav-bar{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.nav-btn{font-size:1.8rem;font-weight:bold;color:#fff;border:4px solid var(--border-color);padding:16px;border-radius:12px;cursor:pointer;text-align:center}
+#back-btn{background:var(--nav-back-bg)}#reset-btn{background:var(--nav-reset-bg)}
+#grid-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;flex-grow:1}
+.choice-card{background:var(--card-bg);border:var(--card-border-width) solid var(--border-color);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;cursor:pointer;min-height:160px;color:var(--text-color)}
+.choice-card:focus,.choice-card:hover{border-color:var(--accent-color);outline:6px solid var(--accent-color);background:var(--card-hover)}
+.choice-symbol{width:70px;height:70px;margin-bottom:10px;display:flex;align-items:center;justify-content:center}
+.choice-symbol svg{width:100%;height:100%;fill:var(--symbol-color);stroke:var(--symbol-color)}
+.choice-label{font-size:1.8rem;font-weight:bold;text-align:center;text-transform:uppercase;color:var(--text-color)}
+.visual-box{width:60px;height:60px;border-radius:6px;border:2px solid var(--border-color)}
+.color-red{background:#f00}.color-blue{background:#06f}.color-yellow{background:#ff0}.color-green{background:#0c4}.color-purple{background:#90c}.color-orange{background:#f60}
+@media(max-width:720px){#sentence-bar{flex-direction:column;align-items:stretch}#sentence-text{font-size:1.7rem}#speak-btn{width:100%}#nav-bar{grid-template-columns:1fr}#grid-container{grid-template-columns:1fr}.choice-card{min-height:130px}}
+</style>
+</head>
+<body>
+<div id="teacher-controls"><span class="teacher-label">DISPLAY MODE:</span><div class="theme-btn-group"><button class="theme-btn" onclick="setTheme('dark')">Black High Contrast</button><button class="theme-btn" onclick="setTheme('light')">White High Contrast</button><button class="theme-btn" onclick="setTheme('reduced')">Reduced Complexity</button></div></div>
+<div id="sentence-bar"><div id="sentence-text">SELECT AN ART PROCESS BELOW</div><button id="speak-btn" onclick="speakCurrentSentence()">🔊 SPEAK</button></div>
+<div id="nav-bar"><button id="back-btn" class="nav-btn" onclick="goBack()">⬅ BACK</button><button id="reset-btn" class="nav-btn" onclick="resetToHome()">🔄 START OVER</button></div>
+<div id="grid-container"></div>
+<script>
+let historyStack=[],currentSentence="",activeSentenceFrame=[],hasFinalSelection=false,selectedFirstAction="";
+const SVGS={
+create:`<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`,
+present:`<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5-7l-3 3.72L9 13l-3 4h12l-4-5z"/></svg>`,
+respond:`<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`,
+connect:`<svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>`,
+chose:`<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" stroke-width="2"/></svg>`,
+used:`<svg viewBox="0 0 24 24"><path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.37l-1.34-1.34a.996.996 0 0 0-1.41 0L9 12.25 11.75 15l8.96-8.96c.39-.39.39-1.02 0-1.41z"/></svg>`,
+changed:`<svg viewBox="0 0 24 24"><path d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 17.7C6.25 16.22 6 14.64 6 13c0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.3c.45 1.48.7 3.06.7 4.7 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z"/></svg>`,
+think:`<svg viewBox="0 0 24 24"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>`,
+like:`<svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`,
+compare:`<svg viewBox="0 0 24 24"><path d="M10 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h5v-18zm4 0v18h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-5z"/></svg>`,
+line:`<svg viewBox="0 0 24 24"><path d="M3 17h18v-2H3v2zm0-7h18V8H3v2z"/></svg>`,
+shape:`<svg viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2z"/></svg>`,
+pattern:`<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 20H4v-4h4v4zm0-6H4v-4h4v4zm0-6H4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4z"/></svg>`,
+texture:`<svg viewBox="0 0 24 24"><path d="M3 3h4v4H3V3zm6 0h4v4H9V3zm6 0h4v4h-4V3zM3 9h4v4H3V9zm6 0h4v4H9V9zm6 0h4v4h-4V9zM3 15h4v4H3v-4zm6 0h4v4H9v-4zm6 0h4v4h-4v-4z"/></svg>`
+};
+const ART_ACTIONS=[{id:"draw",label:"DRAW",text:"draw"},{id:"paint",label:"PAINT",text:"paint"},{id:"cut",label:"CUT",text:"cut"},{id:"glue",label:"GLUE",text:"glue"},{id:"build",label:"BUILD",text:"build"},{id:"add_details",label:"ADD DETAILS",text:"add details"}];
+
+const views={
+home:{sentence:"SELECT AN ART PROCESS",choices:[{label:"CREATE",target:"create_frames",svg:SVGS.create},{label:"PRESENT",target:"present_frames",svg:SVGS.present},{label:"RESPOND",target:"respond_frames",svg:SVGS.respond},{label:"CONNECT",target:"connect_frames",svg:SVGS.connect}]},
+create_frames:{sentence:"CREATE...",choices:[{label:"MY IDEA IS",target:"my_idea_choice",svg:SVGS.create},{label:"FIRST / THEN",target:"first_action",svg:SVGS.changed},{label:"I CHOSE",target:"chose_item",svg:SVGS.chose},{label:"I USED",target:"used_tool",svg:SVGS.used},{label:"I CHANGED",target:"changed_elem",svg:SVGS.changed}]},
+my_idea_choice:{sentence:"My idea for my artwork is...",choices:[{label:"A PERSON",type:"final",val:"My idea for my artwork is a person."},{label:"A PLACE",type:"final",val:"My idea for my artwork is a place."},{label:"NATURE",type:"final",val:"My idea for my artwork is nature."},{label:"AN ANIMAL",type:"final",val:"My idea for my artwork is an animal."},{label:"A FEELING",type:"final",val:"My idea for my artwork is a feeling."},{label:"A MEMORY",type:"final",val:"My idea for my artwork is a memory."}]},
+first_action:{sentence:"First I...",choices:ART_ACTIONS.map(a=>({label:a.label,target:"then_action",actionId:a.id,append:`First I ${a.text}.`}))},
+then_action:{sentence:"Then I...",dynamicChoices:()=>ART_ACTIONS.filter(a=>a.id!==selectedFirstAction).map(a=>({label:a.label,type:"final",val:`Then I ${a.text}.`}))},
+chose_item:{sentence:"I chose...",choices:[{label:"BRIGHT COLORS",target:"chose_because",append:"I chose bright colors"},{label:"BIG SHAPES",target:"chose_because",append:"I chose big shapes"},{label:"DARK LINES",target:"chose_because",append:"I chose dark lines"},{label:"CONTRAST",target:"chose_because",append:"I chose contrast"},{label:"BALANCE",target:"chose_because",append:"I chose balance"},{label:"EMPHASIS",target:"chose_because",append:"I chose emphasis"}]},
+chose_because:{sentence:"because...",choices:[{label:"I LIKE IT",type:"final",val:"because I like it."},{label:"IT IS MY FAVORITE",type:"final",val:"because it is my favorite."},{label:"I WANTED IT BRIGHT",type:"final",val:"because I wanted it bright."},{label:"I WANTED IT DARK",type:"final",val:"because I wanted it dark."},{label:"I WANTED MORE",type:"final",val:"because I wanted more."},{label:"SOMETHING DIFFERENT",type:"final",val:"because I wanted something different."}]},
+used_tool:{sentence:"I used...",choices:[{label:"A PAINTBRUSH",target:"used_purpose",append:"I used a paintbrush"},{label:"CLAY",target:"used_purpose",append:"I used clay"},{label:"MARKERS",target:"used_purpose",append:"I used markers"},{label:"SCISSORS & GLUE",target:"used_purpose",append:"I used scissors and glue"}]},
+used_purpose:{sentence:"to...",choices:[{label:"MAKE LINES",type:"final",val:"to make lines."},{label:"MIX COLORS",type:"final",val:"to mix colors."},{label:"BUILD TEXTURE",type:"final",val:"to build texture."},{label:"CREATE PATTERN",type:"final",val:"to create pattern."},{label:"SHOW MOVEMENT",type:"final",val:"to show movement."}]},
+changed_elem:{sentence:"I changed...",choices:[{label:"THE COLORS",target:"changed_because",append:"I changed the colors"},{label:"THE SHAPES",target:"changed_because",append:"I changed the shapes"},{label:"THE BACKGROUND",target:"changed_because",append:"I changed the background"},{label:"THE DETAILS",target:"changed_because",append:"I changed the details"}]},
+changed_because:{sentence:"because...",choices:[{label:"I WANTED MORE",type:"final",val:"because I wanted more."},{label:"I WANTED LESS",type:"final",val:"because I wanted less."},{label:"I WANTED IT DIFFERENT",type:"final",val:"because I wanted it different."},{label:"I DIDN'T LIKE IT YET",type:"final",val:"because I didn't like it yet."},{label:"I WANTED IT BRIGHTER",type:"final",val:"because I wanted it brighter."},{label:"I WANTED MORE DETAIL",type:"final",val:"because I wanted more detail."}]},
+
+present_frames:{sentence:"PRESENT...",choices:[{label:"MY ARTWORK SHOWS",target:"present_shows",svg:SVGS.present},{label:"MY ARTWORK IS ABOUT",target:"present_about",svg:SVGS.present},{label:"I WANTED IT TO FEEL",target:"present_feel",svg:SVGS.like},{label:"I USED ___ TO SHOW",target:"present_used_to_show",svg:SVGS.used},{label:"I WANT YOU TO NOTICE",target:"present_notice",svg:SVGS.respond}]},
+present_shows:{sentence:"My artwork shows...",choices:[{label:"MY FEELINGS",type:"final",val:"My artwork shows my feelings."},{label:"A STORY",type:"final",val:"My artwork shows a story."},{label:"MOVEMENT",type:"final",val:"My artwork shows movement."},{label:"BALANCE",type:"final",val:"My artwork shows balance."},{label:"CONTRAST",type:"final",val:"My artwork shows contrast."}]},
+present_about:{sentence:"My artwork is about...",choices:[{label:"MY LIFE",type:"final",val:"My artwork is about my life."},{label:"NATURE",type:"final",val:"My artwork is about nature."},{label:"AN IDEA",type:"final",val:"My artwork is about an idea."},{label:"A STORY",type:"final",val:"My artwork is about a story."},{label:"MY COMMUNITY",type:"final",val:"My artwork is about my community."}]},
+present_feel:{sentence:"I wanted my artwork to feel...",choices:[{label:"CALM",target:"present_feel_because",append:"I wanted my artwork to feel calm"},{label:"EXCITING",target:"present_feel_because",append:"I wanted my artwork to feel exciting"},{label:"HAPPY",target:"present_feel_because",append:"I wanted my artwork to feel happy"},{label:"MYSTERIOUS",target:"present_feel_because",append:"I wanted my artwork to feel mysterious"},{label:"POWERFUL",target:"present_feel_because",append:"I wanted my artwork to feel powerful"}]},
+present_feel_because:{sentence:"because...",choices:[{label:"BECAUSE OF THE COLORS",type:"final",val:"because of the colors."},{label:"BECAUSE OF THE LINES",type:"final",val:"because of the lines."},{label:"BECAUSE OF THE SHAPES",type:"final",val:"because of the shapes."},{label:"BECAUSE OF THE PATTERN",type:"final",val:"because of the pattern."},{label:"BECAUSE OF THE TEXTURE",type:"final",val:"because of the texture."},{label:"BECAUSE OF MY SUBJECT",type:"final",val:"because of my subject."}]},
+present_used_to_show:{sentence:"I used...",choices:[{label:"COLOR TO SHOW FEELING",type:"final",val:"I used color to show feeling."},{label:"LINE TO SHOW MOVEMENT",type:"final",val:"I used line to show movement."},{label:"SHAPE TO SHOW BALANCE",type:"final",val:"I used shape to show balance."},{label:"TEXTURE TO SHOW DETAIL",type:"final",val:"I used texture to show detail."}]},
+present_notice:{sentence:"I want you to notice...",choices:[{label:"THE BRIGHT COLORS",type:"final",val:"I want you to notice the bright colors."},{label:"THE BOLD LINES",type:"final",val:"I want you to notice the bold lines."},{label:"THE REPEATING PATTERN",type:"final",val:"I want you to notice the repeating pattern."},{label:"THE UNIQUE TEXTURE",type:"final",val:"I want you to notice the unique texture."}]},
+
+respond_frames:{sentence:"RESPOND...",choices:[{label:"I NOTICE",target:"notice_cat",svg:SVGS.respond},{label:"I THINK",target:"think_meaning",svg:SVGS.think},{label:"I LIKE HOW",target:"like_how",svg:SVGS.like},{label:"SAME / DIFFERENT",target:"compare_root",svg:SVGS.compare}]},
+notice_cat:{sentence:"I notice...",choices:[{label:"COLOR",target:"notice_colors",svg:SVGS.respond},{label:"LINE",target:"notice_lines",svg:SVGS.line},{label:"SHAPE",target:"notice_shapes",svg:SVGS.shape},{label:"PATTERN",target:"notice_patterns",svg:SVGS.pattern},{label:"TEXTURE",target:"notice_texture",svg:SVGS.texture}]},
+notice_colors:{sentence:"I notice...",choices:[{label:"RED",type:"final",val:"I notice red.",render:"<div class='visual-box color-red'></div>"},{label:"BLUE",type:"final",val:"I notice blue.",render:"<div class='visual-box color-blue'></div>"},{label:"YELLOW",type:"final",val:"I notice yellow.",render:"<div class='visual-box color-yellow'></div>"},{label:"GREEN",type:"final",val:"I notice green.",render:"<div class='visual-box color-green'></div>"},{label:"PURPLE",type:"final",val:"I notice purple.",render:"<div class='visual-box color-purple'></div>"},{label:"ORANGE",type:"final",val:"I notice orange.",render:"<div class='visual-box color-orange'></div>"}]},
+notice_lines:{sentence:"I notice...",choices:[{label:"STRAIGHT LINES",type:"final",val:"I notice straight lines.",svg:SVGS.line},{label:"WAVY LINES",type:"final",val:"I notice wavy lines.",svg:SVGS.line},{label:"ZIGZAG LINES",type:"final",val:"I notice zigzag lines.",svg:SVGS.line}]},
+notice_shapes:{sentence:"I notice...",choices:[{label:"CIRCLES",type:"final",val:"I notice circles.",svg:SVGS.shape},{label:"SQUARES",type:"final",val:"I notice squares.",svg:SVGS.shape},{label:"TRIANGLES",type:"final",val:"I notice triangles.",svg:SVGS.shape}]},
+notice_patterns:{sentence:"I notice...",choices:[{label:"REPEATING PATTERN",type:"final",val:"I notice a repeating pattern.",svg:SVGS.pattern},{label:"GRID PATTERN",type:"final",val:"I notice a grid pattern.",svg:SVGS.pattern}]},
+notice_texture:{sentence:"I notice...",choices:[{label:"ROUGH TEXTURE",type:"final",val:"I notice rough texture.",svg:SVGS.texture},{label:"SMOOTH TEXTURE",type:"final",val:"I notice smooth texture.",svg:SVGS.texture},{label:"BUMPY TEXTURE",type:"final",val:"I notice bumpy texture.",svg:SVGS.texture}]},
+think_meaning:{sentence:"I think the artwork means...",choices:[{label:"HAPPINESS",target:"think_evidence",append:"I think the artwork means happiness"},{label:"SADNESS",target:"think_evidence",append:"I think the artwork means sadness"},{label:"PEACE",target:"think_evidence",append:"I think the artwork means peace"},{label:"ENERGY",target:"think_evidence",append:"I think the artwork means energy"}]},
+think_evidence:{sentence:"because...",choices:[{label:"BECAUSE OF THE COLORS",type:"final",val:"because of the colors."},{label:"BECAUSE OF THE LINES",type:"final",val:"because of the lines."},{label:"BECAUSE OF THE SHAPES",type:"final",val:"because of the shapes."},{label:"BECAUSE OF THE PATTERN",type:"final",val:"because of the pattern."},{label:"BECAUSE OF THE EXPRESSION",type:"final",val:"because of the expression."},{label:"WHAT IS HAPPENING",type:"final",val:"because of what is happening."}]},
+like_how:{sentence:"I like how...",choices:[{label:"THE COLORS MIX",type:"final",val:"I like how the colors mix."},{label:"THE LINES MOVE",type:"final",val:"I like how the lines create movement."},{label:"THE SHAPES REPEAT",type:"final",val:"I like how the shapes repeat."},{label:"THE TEXTURE FEELS",type:"final",val:"I like how the texture looks and feels."}]},
+compare_root:{sentence:"Comparing two artworks...",choices:[{label:"BOTH HAVE SAME",target:"compare_same",svg:SVGS.compare},{label:"THEY HAVE DIFFERENT",target:"compare_diff",svg:SVGS.compare}]},
+compare_same:{sentence:"Both artworks have the same...",choices:[{label:"COLORS",type:"final",val:"Both artworks have the same colors."},{label:"SHAPES",type:"final",val:"Both artworks have the same shapes."},{label:"LINES",type:"final",val:"Both artworks have the same lines."},{label:"PATTERNS",type:"final",val:"Both artworks have the same patterns."}]},
+compare_diff:{sentence:"These artworks have different...",choices:[{label:"COLORS",type:"final",val:"These artworks have different colors."},{label:"TEXTURES",type:"final",val:"These artworks have different textures."},{label:"SIZES",type:"final",val:"These artworks have different sizes."},{label:"FEELINGS",type:"final",val:"These artworks have different feelings."}]},
+
+connect_frames:{sentence:"CONNECT...",choices:[{label:"IT REMINDS ME OF",target:"reminds_list",svg:SVGS.connect},{label:"THIS ART SHOWS",target:"shows_cultural",svg:SVGS.present},{label:"I CONNECT BECAUSE",target:"connect_because",svg:SVGS.like}]},
+reminds_list:{sentence:"This artwork reminds me of...",choices:[{label:"NATURE",type:"final",val:"This artwork reminds me of nature."},{label:"HOME",type:"final",val:"This artwork reminds me of home."},{label:"ANIMALS",type:"final",val:"This artwork reminds me of animals."},{label:"MY FAMILY",type:"final",val:"This artwork reminds me of my family."}]},
+shows_cultural:{sentence:"This art shows...",choices:[{label:"A TRADITION",type:"final",val:"This art shows a tradition."},{label:"A CELEBRATION",type:"final",val:"This art shows a celebration."},{label:"A PLACE",type:"final",val:"This art shows a place."},{label:"A COMMUNITY",type:"final",val:"This art shows a community."},{label:"A BELIEF",type:"final",val:"This art shows a belief."},{label:"A TIME IN HISTORY",type:"final",val:"This art shows a time in history."}]},
+connect_because:{sentence:"I connect to this art because...",choices:[{label:"IT MAKES ME HAPPY",type:"final",val:"I connect to this art because it makes me happy."},{label:"I LOVE NATURE",type:"final",val:"I connect to this art because I love nature."},{label:"IT IS INTERESTING",type:"final",val:"I connect to this art because it is interesting."}]}
+};
+
+function renderView(viewKey,isBack=false){
+ const view=views[viewKey]; if(!view)return;
+ if(!isBack&&historyStack[historyStack.length-1]!==viewKey)historyStack.push(viewKey);
+ const grid=document.getElementById("grid-container");grid.innerHTML="";
+ if(view.sentence&&activeSentenceFrame.length===0)updateSentenceDisplay(view.sentence);
+ const choiceList=view.dynamicChoices?view.dynamicChoices():view.choices;
+ choiceList.forEach(choice=>{
+   const card=document.createElement("button");card.className="choice-card";card.tabIndex=0;card.setAttribute("aria-label",choice.label);
+   const symbolHTML=choice.render?choice.render:(choice.svg||SVGS.create);
+   card.innerHTML=`<div class="choice-symbol">${symbolHTML}</div><div class="choice-label">${choice.label}</div>`;
+   card.onclick=()=>handleSelection(choice);grid.appendChild(card);
+ });
+}
+
+function handleSelection(choice){
+ if(choice.actionId)selectedFirstAction=choice.actionId;
+ if(choice.append){activeSentenceFrame.push(choice.append);hasFinalSelection=false;updateSentenceDisplay(activeSentenceFrame.join(" ")+" ...");}
+ if(choice.type==="final"){
+   if(activeSentenceFrame.length>0){
+     if(hasFinalSelection)activeSentenceFrame[activeSentenceFrame.length-1]=choice.val;
+     else{activeSentenceFrame.push(choice.val);hasFinalSelection=true;}
+     const fullSentence=activeSentenceFrame.join(" ");updateSentenceDisplay(fullSentence);speakText(fullSentence);
+   }else{updateSentenceDisplay(choice.val);speakText(choice.val);}
+ }else if(choice.target)renderView(choice.target);
+}
+
+function updateSentenceDisplay(text){currentSentence=text;document.getElementById("sentence-text").innerText=text;}
+function goBack(){
+ if(historyStack.length>1){
+   historyStack.pop();
+   if(hasFinalSelection){activeSentenceFrame.pop();hasFinalSelection=false;}
+   else if(activeSentenceFrame.length>0)activeSentenceFrame.pop();
+   const previousView=historyStack[historyStack.length-1];renderView(previousView,true);
+ }
+}
+function resetToHome(){historyStack=[];activeSentenceFrame=[];hasFinalSelection=false;selectedFirstAction="";renderView("home");}
+function setTheme(mode){document.body.classList.remove("theme-light","theme-reduced");if(mode==="light")document.body.classList.add("theme-light");else if(mode==="reduced")document.body.classList.add("theme-reduced");}
+function speakCurrentSentence(){speakText(currentSentence);}
+function speakText(text){if("speechSynthesis" in window&&text&&text!=="SELECT AN ART PROCESS"){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.rate=.85;window.speechSynthesis.speak(u);}}
+window.onload=()=>resetToHome();
+</script>
+</body>
+</html>
